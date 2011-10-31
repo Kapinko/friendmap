@@ -1,78 +1,102 @@
 <?php
+/**
+ * Copyright 2011 Facebook, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may
+ * not use this file except in compliance with the License. You may obtain
+ * a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations
+ * under the License.
+ */
 
 require dirname(__FILE__).'/php-sdk/src/facebook.php';
 
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
-
-
-$googleBaseURL="http://maps.googleapis.com/maps/api/staticmap?size=640x640&sensor=true";
-
+// Create our Application instance (replace this with your appId and secret).
 $facebook = new Facebook(array(
   'appId'  => '267947846583709',
   'secret' => '2bf606b5cd75c2a2be44f19a9ef2fb04',
 ));
 
+// Get User ID
+$user = $facebook->getUser();
 
-$access_token="AAADzsng2xZA0BAMUSqX4cabnlYmEJPpBrO5lUbU7MawCNIAigXFtJ5fdILvTuw4oMWVFStbCuZBvFfygnp1rK3YjS2YgTeQuALtOso7QZDZD";
- 
-$fql = "SELECT current_location from user where uid IN (SELECT uid2 FROM friend WHERE uid1=me())";
+// We may or may not have this data based on whether the user is logged in.
+//
+// If we have a $user id here, it means we know the user is logged into
+// Facebook, but we don't know if the access token is valid. An access
+// token is invalid if the user logged out of Facebook.
 
-$response = $facebook->api(array(
-'access_token'=>$access_token,
-'method' => 'fql.query',
-'query' =>$fql,
-));
- 
-$locationIDArray = array();
-
-foreach ($response as $cur)
-{
-    if($cur[current_location][id])
-    {
-        if(array_search($cur[current_location][id], $locationIDArray)===FALSE)
-        {
-            $locationIDArray[]=$cur[current_location][id];
-        }
-        
-    }
+if ($user) {
+  try {
+    // Proceed knowing you have a logged in user who's authenticated.
+    $user_profile = $facebook->api('/me');
+  } catch (FacebookApiException $e) {
+    error_log($e);
+    $user = null;
+  }
 }
 
-$location_list=implode(",", $locationIDArray);
-
-
-$fql = "SELECT latitude,longitude from place where page_id IN (".$location_list.")";
-
-
-$response = $facebook->api(array(
-'access_token'=>$access_token,
-'method' => 'fql.query',
-'query' =>$fql,
-));
-
-
-var_export($response);
- 
-
-foreach ($response as $key => $value) {
-    
-    if($value[latitude]&&$value[longitude])
-    {
-       
-        $googleBaseURL.="&markers=".round($value[latitude],2).",".round($value[longitude],2);
-    }
-    
+// Login or logout url will be needed depending on current user state.
+if ($user) {
+  $logoutUrl = $facebook->getLogoutUrl();
+} else {
+  $loginUrl = $facebook->getLoginUrl();
 }
 
-
-echo strlen($googleBaseURL);
-echo $googleBaseURL;
-
-
-
-
-
+// This call will always work since we are fetching public data.
+$naitik = $facebook->api('/naitik');
 
 ?>
+<!doctype html>
+<html xmlns:fb="http://www.facebook.com/2008/fbml">
+  <head>
+    <title>php-sdk</title>
+    <style>
+      body {
+        font-family: 'Lucida Grande', Verdana, Arial, sans-serif;
+      }
+      h1 a {
+        text-decoration: none;
+        color: #3b5998;
+      }
+      h1 a:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>php-sdk</h1>
+
+    <?php if ($user): ?>
+      <a href="<?php echo $logoutUrl; ?>">Logout</a>
+    <?php else: ?>
+      <div>
+        Login using OAuth 2.0 handled by the PHP SDK:
+        <a href="<?php echo $loginUrl; ?>">Login with Facebook</a>
+      </div>
+    <?php endif ?>
+
+    <h3>PHP Session</h3>
+    <pre><?php print_r($_SESSION); ?></pre>
+
+    <?php if ($user): ?>
+      <h3>You</h3>
+      <img src="https://graph.facebook.com/<?php echo $user; ?>/picture">
+
+      <h3>Your User Object (/me)</h3>
+      <pre><?php print_r($user_profile); ?></pre>
+    <?php else: ?>
+      <strong><em>You are not Connected.</em></strong>
+    <?php endif ?>
+
+    <h3>Public profile of Naitik</h3>
+    <img src="https://graph.facebook.com/naitik/picture">
+    <?php echo $naitik['name']; ?>
+  </body>
+</html>
